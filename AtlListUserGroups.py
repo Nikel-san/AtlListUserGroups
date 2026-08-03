@@ -3,7 +3,7 @@
 List Atlassian Cloud groups for a user (by email).
 
 Example:
-  python3 AtlListUserGroups.py -s your-site.atlassian.net -a admin@example.com -t ABCDE... -u target@example.com -d dest@example.com
+  python3 AtlListUserGroups.py -s my-company.atlassian.net -a admin@example.com -t API_TOKEN -u target@example.com -d dest@example.com
 """
 import argparse
 import sys
@@ -54,26 +54,23 @@ def add_user_to_group(base_url, auth, group_name, account_id):
 
 def main():
     p = argparse.ArgumentParser(description="List and optionally copy Atlassian Cloud group memberships from a source user to a destination user")
-    p.add_argument("-s", "--site", required=False, help="Your Atlassian site, e.g. my-org.atlassian.net (default: iderawebdev.atlassian.net)")
-    p.add_argument("-a", "--admin-email", required=False, help="Admin account email (for API auth). If omitted, uses env JIRA_EMAIL")
-    p.add_argument("-t", "--api-token", required=False, help="API token (create at https://id.atlassian.com/manage-profile/security/api-tokens). If omitted, uses env JIRA_PAT")
-    p.add_argument("-u", "--user-email", required=True, help="Target user's email to query groups for (domain optional)")
-    p.add_argument("-d", "--dest-email", required=False, help="Destination user email to copy group membership to (domain optional)")
+    p.add_argument("-s", "--site", required=False, help="Your Atlassian site, e.g. my-company.atlassian.net (env: ATLASSIAN_SITE)")
+    p.add_argument("-a", "--admin-email", required=False, help="Admin account email for API auth (env: JIRA_EMAIL)")
+    p.add_argument("-t", "--api-token", required=False, help="API token (env: JIRA_PAT)")
+    p.add_argument("-u", "--user-email", required=True, help="Target user's full email to query groups for (e.g. target@example.com)")
+    p.add_argument("-d", "--dest-email", required=False, help="Destination user's full email to copy group membership to (e.g. dest@example.com)")
     args = p.parse_args()
 
-    # default site if not provided
-    site_value = args.site
+    site_value = args.site or os.environ.get('ATLASSIAN_SITE')
     if not site_value:
-        site_value = 'iderawebdev.atlassian.net'
-        warn(f"--site not provided, using default: {site_value}")
+        print("Error: site not provided. Supply --site or set ATLASSIAN_SITE environment variable.", file=sys.stderr)
+        sys.exit(1)
 
     base_url = build_base_url(site_value)
 
-    # admin creds: prefer CLI, fallback to env vars
     admin_email = args.admin_email or os.environ.get('JIRA_EMAIL')
     api_token = args.api_token or os.environ.get('JIRA_PAT')
 
-    # warn if falling back to env vars
     if not args.admin_email and os.environ.get('JIRA_EMAIL'):
         warn("--admin-email not provided, using JIRA_EMAIL from environment")
     if not args.api_token and os.environ.get('JIRA_PAT'):
@@ -84,11 +81,7 @@ def main():
         sys.exit(1)
 
     auth = HTTPBasicAuth(admin_email, api_token)
-    # if email domain missing, append default and warn
     user_email = args.user_email
-    if '@' not in user_email:
-        user_email = user_email + '@idera.com'
-        warn(f"--user-email domain not provided, using default: {user_email}")
 
     try:
         account_id = find_user_account_id(base_url, auth, user_email)
@@ -122,9 +115,6 @@ def main():
     dest_account_id = None
     if args.dest_email:
         dest_email = args.dest_email
-        if '@' not in dest_email:
-            dest_email = dest_email + '@idera.com'
-            warn(f"--dest-email domain not provided, using default: {dest_email}")
         try:
             dest_account_id = find_user_account_id(base_url, auth, dest_email)
         except requests.HTTPError as e:
