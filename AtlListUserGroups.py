@@ -30,9 +30,7 @@ def find_user_account_id(base_url, auth, target_email):
     users = resp.json()
     if not users:
         return None
-    # Prefer exact email match if present, otherwise take first result
     for u in users:
-        # emailAddress may be omitted depending on instance/privacy; try a few keys
         if u.get("emailAddress") == target_email or u.get("email") == target_email:
             return u.get("accountId")
     return users[0].get("accountId")
@@ -50,7 +48,10 @@ def add_user_to_group(base_url, auth, group_name, account_id):
     params = {"groupname": group_name}
     resp = requests.post(url, auth=auth, params=params, json={"accountId": account_id}, timeout=15)
     resp.raise_for_status()
-    return resp.json()
+    try:
+        return resp.json()
+    except Exception:
+        return {}
 
 def main():
     p = argparse.ArgumentParser(description="List and optionally copy Atlassian Cloud group memberships from a source user to a destination user")
@@ -111,7 +112,6 @@ def main():
         print(f"No groups found for user {args.user_email} (accountId {account_id})")
         return
 
-    # print groups and optionally copy membership to destination user
     dest_account_id = None
     if args.dest_email:
         dest_email = args.dest_email
@@ -129,30 +129,43 @@ def main():
             print(f"No destination user found matching email: {args.dest_email}", file=sys.stderr)
             sys.exit(6)
 
+    added = 0
+    skipped = 0
+    failed = 0
+
     for g in groups:
-        # group object typically contains 'name' and 'self' and maybe 'displayName'
         name = g.get("name") or g.get("displayName") or str(g)
 
         if dest_account_id:
-            # copying mode: do not print group names, only print action results
             try:
                 add_user_to_group(base_url, auth, name, dest_account_id)
                 print(f"Added {dest_email} to group: {name}")
+                added += 1
             except requests.HTTPError as e:
-                # If already a member or other client error, print and continue
                 status = getattr(e.response, 'status_code', None)
                 if status in (400, 409):
-                    print(f"Destination user may already be a member of '{name}' or bad request (status {status})", file=sys.stderr)
+                    print(f"Skipped '{name}': user already a member or bad request (status {status})", file=sys.stderr)
+                    skipped += 1
+                elif status == 403:
+                    print(f"Skipped '{name}': forbidden — managed group or insufficient permissions (status 403)", file=sys.stderr)
+                    skipped += 1
                 else:
-                    print(f"Error adding user to group {name}: {e}", file=sys.stderr)
+                    print(f"Error adding user to group '{name}': {e}", file=sys.stderr)
+                    failed += 1
                 try:
                     print(e.response.text, file=sys.stderr)
                 except Exception:
                     pass
                 continue
+            except Exception as e:
+                print(f"Error adding user to group '{name}': {e}", file=sys.stderr)
+                failed += 1
+                continue
         else:
-            # listing mode: print group names
             print(name)
+
+    if dest_account_id:
+        print(f"\nDone. added={added} skipped={skipped} failed={failed}", file=sys.stderr)
 
 if __name__ == "__main__":
     main()
