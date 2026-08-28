@@ -147,7 +147,7 @@ def main():
                     print(f"Skipped '{name}': user already a member or bad request (status {status})", file=sys.stderr)
                     skipped += 1
                 elif status == 403:
-                    print(f"Skipped '{name}': forbidden — managed group or insufficient permissions (status 403)", file=sys.stderr)
+                    print(f"Skipped '{name}': forbidden â€” managed group or insufficient permissions (status 403)", file=sys.stderr)
                     skipped += 1
                 else:
                     print(f"Error adding user to group '{name}': {e}", file=sys.stderr)
