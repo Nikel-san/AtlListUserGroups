@@ -19,11 +19,15 @@ Script
 	- -t, --api-token       API token (env: JIRA_PAT)
 	- -u, --user-email      Source user's full email, e.g. target@example.com
 	- -d, --dest-email      Destination user's full email, e.g. dest@example.com
+	- -f, --file            CSV file containing source and destination email pairs
   - Usage examples:
 	- List groups:
 	  python AtlListUserGroups.py -s my-company.atlassian.net -a admin@example.com -t API_TOKEN -u target@example.com
 	- Copy groups to another user:
 	  python AtlListUserGroups.py -s my-company.atlassian.net -a admin@example.com -t API_TOKEN -u source@example.com -d dest@example.com
+	- Copy groups for CSV pairs:
+	  python AtlListUserGroups.py -s my-company.atlassian.net -a admin@example.com -t API_TOKEN -f users.csv
+	  CSV format: source@example.com,dest@example.com
   - Behavior notes:
 	- If --site is omitted the script uses the ATLASSIAN_SITE environment variable if set; otherwise it exits with a clear error.
 	- Full email addresses should be provided for --user-email and --dest-email.
